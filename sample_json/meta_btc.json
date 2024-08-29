@@ -1,0 +1,134 @@
+{
+  "id": "sol-solana",
+  "name": "Solana",
+  "symbol": "SOL",
+  "rank": 5,
+  "is_new": false,
+  "is_active": true,
+  "type": "coin",
+  "logo": "https://static.coinpaprika.com/coin/sol-solana/logo.png",
+  "tags": [
+    {
+      "id": "cryptocurrency",
+      "name": "Cryptocurrency",
+      "coin_counter": 1147,
+      "ico_counter": 40
+    },
+    {
+      "id": "byzantine-fault-tolerance",
+      "name": "Byzantine Fault Tolerance",
+      "coin_counter": 20,
+      "ico_counter": 1
+    },
+    {
+      "id": "layer-1-l1",
+      "name": "Layer 1 (L1)",
+      "coin_counter": 113,
+      "ico_counter": 0
+    },
+    {
+      "id": "smart-contracts",
+      "name": "Smart Contracts",
+      "coin_counter": 507,
+      "ico_counter": 305
+    },
+    {
+      "id": "proof-of-stake",
+      "name": "Proof Of Stake",
+      "coin_counter": 908,
+      "ico_counter": 2
+    },
+    {
+      "id": "ftx-holdings",
+      "name": "FTX Holdings",
+      "coin_counter": 15,
+      "ico_counter": 0
+    },
+    {
+      "id": "high-transaction-speed-tps",
+      "name": "High Transaction Speed (TPS)",
+      "coin_counter": 22,
+      "ico_counter": 0
+    },
+    {
+      "id": "alleged-sec-securities",
+      "name": "Alleged SEC Securities",
+      "coin_counter": 45,
+      "ico_counter": 0
+    }
+  ],
+  "team": [],
+  "description": "Solana is a public blockchain. It is open-source and decentralised, and achieves consensus using a proof-of-stake algorithm together with a novel algorithm called proof-of-history. Its internal cryptocurrency has the symbol SOL. Bloomberg considers the platform \"a potential long-term rival to Ethereum.\" Like Ethereum, Solana can interact with smart contracts.\r\n\r\nOn 14 September 2021, Solana's blockchain went offline after a wave of transactions caused discord between network participants and a subsequent split into multiple blocks. The network was successfully restored early on 15 September. Solana can likely handle 50,000 transactions per second, making it faster than Ethereum, but still lower than the 400,000 transactions seen during the peak.",
+  "message": "",
+  "open_source": true,
+  "started_at": "2020-04-10T00:00:00Z",
+  "development_status": "Working product",
+  "hardware_wallet": false,
+  "proof_type": "Delegated Proof of Stake",
+  "org_structure": "Centralized \u003e Hierarchical",
+  "hash_algorithm": "Tower BFT",
+  "links": {
+    "explorer": [
+      "https://explorer.solana.com",
+      "https://solanabeach.io"
+    ],
+    "reddit": [
+      "https://reddit.com/r/solana"
+    ],
+    "source_code": [
+      "https://github.com/solana-labs/"
+    ],
+    "website": [
+      "https://solana.com"
+    ]
+  },
+  "links_extended": [
+    {
+      "url": "https://medium.com/solana-labs",
+      "type": "blog"
+    },
+    {
+      "url": "https://explorer.solana.com",
+      "type": "explorer"
+    },
+    {
+      "url": "https://solanabeach.io",
+      "type": "explorer"
+    },
+    {
+      "url": "https://reddit.com/r/solana",
+      "type": "reddit",
+      "stats": {
+        "subscribers": 170050
+      }
+    },
+    {
+      "url": "https://github.com/solana-labs/",
+      "type": "source_code"
+    },
+    {
+      "url": "https://t.me/solanaio",
+      "type": "telegram",
+      "stats": {
+        "members": 3556
+      }
+    },
+    {
+      "url": "https://twitter.com/solana",
+      "type": "twitter",
+      "stats": {
+        "followers": 2219988
+      }
+    },
+    {
+      "url": "https://solana.com",
+      "type": "website"
+    }
+  ],
+  "whitepaper": {
+    "link": "https://static.coinpaprika.com/storage/cdn/whitepapers/10608577.pdf",
+    "thumbnail": "https://static.coinpaprika.com/storage/cdn/whitepapers/10608579.jpg"
+  },
+  "first_data_at": "2020-08-26T00:00:00Z",
+  "last_data_at": "2024-08-29T00:44:00Z"
+}

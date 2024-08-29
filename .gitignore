@@ -1,0 +1,6 @@
+cassandra_data
+postgres_data
+.env
+__pycache__
+.venv
+.idea

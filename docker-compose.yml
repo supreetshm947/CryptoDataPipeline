@@ -1,0 +1,35 @@
+version: '3.9'
+
+services:
+  cassandra:
+    image: bitnami/cassandra:latest
+    user: root
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+      - "7000:7000"
+    volumes:
+      - ./cassandra_data:/bitnami
+      - ./cql_scripts/:/docker-entrypoint-initdb.d
+    environment:
+      - CASSANDRA_CLUSTER_NAME=crypto-cluster
+      - CASSANDRA_DC=datacenter1
+      - cluster.rack=rack1
+      - CASSANDRA_SEEDS=cassandra
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./sql_scripts/tables.sql:/docker-entrypoint-initdb.d/tables.sql
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
+
+volumes:
+  cassandra:
+  postgres:

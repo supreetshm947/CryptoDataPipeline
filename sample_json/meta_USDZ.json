@@ -1,0 +1,106 @@
+{
+  "id": "usdz-anzen-usdz",
+  "name": "Anzen USDz",
+  "symbol": "USDZ",
+  "rank": 567,
+  "is_new": true,
+  "is_active": true,
+  "type": "token",
+  "contract": "0x52056ed29fe015f4ba2e3b079d10c0b87f46e8c6",
+  "platform": "blast-blast",
+  "contracts": [
+    {
+      "contract": "0xa469b7ee9ee773642b3e93e842e5d9b5baa10067",
+      "platform": "eth-ethereum",
+      "type": "ERC20"
+    },
+    {
+      "contract": "0x5018609ab477cc502e170a5accf5312b86a4b94f",
+      "platform": "arb-arbitrum",
+      "type": "Other"
+    },
+    {
+      "contract": "0x04d5ddf5f3a8939889f11e97f8c4bb48317f1938",
+      "platform": "base-base",
+      "type": "Other"
+    },
+    {
+      "contract": "0x52056ed29fe015f4ba2e3b079d10c0b87f46e8c6",
+      "platform": "blast-blast",
+      "type": "Other"
+    }
+  ],
+  "logo": "https://static.coinpaprika.com/coin/usdz-anzen-usdz/logo.png",
+  "parent": {
+    "id": "blast-blast",
+    "name": "BLAST",
+    "symbol": "BLAST"
+  },
+  "tags": [
+    {
+      "id": "stablecoin",
+      "name": "Stablecoin",
+      "coin_counter": 91,
+      "ico_counter": 0
+    },
+    {
+      "id": "erc20",
+      "name": "Ethereum (ETH) Token (ERC-20)",
+      "coin_counter": 11093,
+      "ico_counter": 403
+    },
+    {
+      "id": "arbitrum-ecosystem",
+      "name": "Arbitrum Ecosystem",
+      "coin_counter": 640,
+      "ico_counter": 1
+    },
+    {
+      "id": "base-token",
+      "name": "Base Ecosystem",
+      "coin_counter": 478,
+      "ico_counter": 0
+    },
+    {
+      "id": "blast-ecosystem",
+      "name": "Blast Ecosystem",
+      "coin_counter": 15,
+      "ico_counter": 0
+    }
+  ],
+  "team": [],
+  "description": "",
+  "message": null,
+  "open_source": false,
+  "started_at": null,
+  "development_status": null,
+  "hardware_wallet": false,
+  "proof_type": null,
+  "org_structure": null,
+  "hash_algorithm": null,
+  "links": {
+    "website": [
+      "https://anzen.finance/"
+    ]
+  },
+  "links_extended": [
+    {
+      "url": "https://t.me/AnzenCommunity",
+      "type": "telegram"
+    },
+    {
+      "url": "https://twitter.com/anzenfinance",
+      "type": "twitter"
+    },
+    {
+      "url": "https://anzen.finance/",
+      "type": "website"
+    }
+  ],
+  "whitepaper": {
+    "link": "https://docs.anzen.finance/",
+    "thumbnail": "https://static.coinpaprika.com/storage/cdn/whitepapers/11288231.jpg"
+  },
+  "first_data_at": "2024-08-27T00:00:00Z",
+  "last_data_at": "2024-08-29T00:51:00Z"
+}
