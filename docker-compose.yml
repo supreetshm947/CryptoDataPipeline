@@ -30,6 +30,30 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
 
+  zookeeper:
+    image: zookeeper:3.7.1
+    container_name: zookeeper
+    ports:
+      - "${ZOOKEEPER_PORT}:${ZOOKEEPER_PORT}"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    ports:
+      - "${KAFKA_OUTSIDE_PORT}:${KAFKA_OUTSIDE_PORT}"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:${KAFKA_INSIDE_PORT},OUTSIDE://${KAFKA_HOST}:${KAFKA_OUTSIDE_PORT}
+      KAFKA_LISTENER_NAME: INSIDE
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: INSIDE://0.0.0.0:${KAFKA_INSIDE_PORT},OUTSIDE://0.0.0.0:${KAFKA_OUTSIDE_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:${ZOOKEEPER_PORT}
+    depends_on:
+        - zookeeper
+
 volumes:
   cassandra:
   postgres:

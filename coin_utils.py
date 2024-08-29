@@ -1,12 +1,12 @@
 import requests
 import pandas as pd
-import spark_utils.postgres as postgres
+import spark.postgres as postgres
 from pyspark.sql.functions import col, to_timestamp
 from pyspark.sql import Row
 from constants import (POSTGRES_TABLE_META_DATA, POSTGRES_TABLE_META_DATA_ID, CASSANDRA_KEYSPACE,
                        CASSANDRA_TABLE_CRYPTO_PRICE_DATA, NUMBER_OF_COINS)
 from utils import convert_iso_to_datetime
-import spark_utils.cassandra as cassandra
+import spark.cassandra as cassandra
 import logging
 import traceback
 
@@ -30,6 +30,22 @@ def fetch_coins():
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
     return pd.DataFrame()
+
+
+def fetch_coin_tickers_data(coin_id):
+    try:
+        response_ticker = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}")
+        response_ticker.raise_for_status()
+
+        return response_ticker.json()
+
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred while retrieving data for {coin_id}: {http_err}")
+    except requests.exceptions.RequestException as req_err:
+        print(f"Request error occurred while retrieving data for {coin_id}: {req_err}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    return None
 
 
 def fetch_coin_meta_data(coin_id):
@@ -137,7 +153,30 @@ def fetch_coin_pricing_historic(coin_id, start_timestamp, interval='1d'):
     return pd.DataFrame()
 
 
-def insert_coin_price_in_db(coin_id, coin_price_data):
+def insert_coin_price_in_db(coin_price_data):
+    try:
+        session = cassandra.get_session()
+        date_time = convert_iso_to_datetime(coin_price_data["last_updated"])
+        data = [
+            Row(coin_id=coin_price_data["id"],
+                read_timestamp=coin_price_data["timestamp"],
+                date=date_time.date(),
+                hour=date_time.hour,
+                price=float(coin_price_data["quotes"]["USD"]["price"]),
+                volume_24h=coin_price_data["quotes"]["USD"]["volume_24h"],
+                market_cap=coin_price_data["quotes"]["USD"]["market_cap"]
+                )
+        ]
+        df = session.createDataFrame(data)
+        cassandra.insert_df(df, CASSANDRA_KEYSPACE, CASSANDRA_TABLE_CRYPTO_PRICE_DATA, coin_price_data["id"])
+        cassandra.close_session(session)
+    except Exception as e:
+        coin_id = coin_price_data["id"]
+        logger.error(f"Something went wrong while persisting price data for {coin_id}:{e}")
+        logger.error(traceback.format_exc())
+
+
+def insert_historic_coin_price_in_db(coin_id, coin_price_data):
     try:
         session = cassandra.get_session()
         data_list = []
@@ -172,7 +211,8 @@ def load_coin_historic_data(start_date, interval="1d"):
         logger.error(f"Something went wrong while retreving coins_ids from database:{e}")
     for coin_id in ids:
         coin_historic = fetch_coin_pricing_historic(coin_id, start_date, interval)
-        insert_coin_price_in_db(coin_id, coin_historic)
+        insert_historic_coin_price_in_db(coin_id, coin_historic)
+
 
 from datetime import datetime, timedelta
 
