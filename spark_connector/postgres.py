@@ -7,22 +7,22 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-def get_session():
-    session = SparkSession.builder.appName("postgres_connector").config("spark.jars",
-                                                                        "postgresql-42.7.4.jar").getOrCreate()
-    session.sparkContext.setLogLevel("WARN")
-    logger.info(
-        f"Spark Session for Postgres Started.")
-    return session
+# def get_session():
+#     session = SparkSession.builder.appName("postgres_connector").config("spark.jars",
+#                                                                         "postgresql-42.7.4.jar").getOrCreate()
+#     session.sparkContext.setLogLevel("WARN")
+#     logger.info(
+#         f"Spark Session for Postgres Started.")
+#     return session
 
 
-def close_session(session):
-    try:
-        session.stop()
-        logger.info(
-            f"Spark Session Closed Successfully.")
-    except Exception as e:
-        logger.error(f" Something went wrong while closing session: {e}")
+# def close_session(session):
+#     try:
+#         session.stop()
+#         logger.info(
+#             f"Spark Session Closed Successfully.")
+#     except Exception as e:
+#         logger.error(f" Something went wrong while closing session: {e}")
 
 
 def check_if_id_already_exists(session, db_table, id_col, id_val):
