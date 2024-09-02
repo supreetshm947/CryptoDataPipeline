@@ -1,0 +1,12 @@
+FROM python:3.9
+
+# Install Curator
+RUN pip install elasticsearch python-dotenv
+
+
+# Copy pytohn file
+COPY ./init/create_index.py /app/create_index.py
+COPY ./.env /app/.env
+
+# Run Curator
+CMD ["python", "/app/create_index.py"]

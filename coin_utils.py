@@ -4,7 +4,7 @@ import spark_connector.postgres as postgres
 from pyspark.sql.functions import col, to_timestamp
 from pyspark.sql import Row
 from constants import (POSTGRES_TABLE_META_DATA, POSTGRES_TABLE_META_DATA_ID,
-                       CASSANDRA_TABLE_CRYPTO_PRICE_DATA, NUMBER_OF_COINS)
+                       CASSANDRA_TABLE_CRYPTO_PRICE_DATA, NUMBER_OF_COINS, POSTGRES_TABLE_META_DATA_IS_MONITORED)
 from utils import convert_iso_to_datetime
 import spark_connector.cassandra as cassandra
 import logging
@@ -67,7 +67,7 @@ def fetch_coin_meta_data(coin_id):
     return None
 
 
-def load_coin_metadata(n=NUMBER_OF_COINS):
+def load_coin_metadata(session, n=NUMBER_OF_COINS):
     coins = fetch_coins()
 
     top_n = coins[(coins['rank'] > 0) & (coins['rank'] <= n)]
@@ -76,11 +76,8 @@ def load_coin_metadata(n=NUMBER_OF_COINS):
 
     all_coins_metadata = [fetch_coin_meta_data(coin['id']) for _, coin in all_coins.iterrows()]
 
-    session = postgres.get_session()
     for meta_data in all_coins_metadata:
         insert_coin_metadata_in_db(meta_data, session)
-
-    postgres.close_session(session)
 
 
 def insert_coin_metadata_in_db(coin_metadata, session):
@@ -196,19 +193,24 @@ def insert_historic_coin_price_in_db(session, coin_id, coin_price_data):
         logger.error(traceback.format_exc())
         raise e
 
-def load_coin_historic_data(session, start_date, interval="1d"):
+def load_coin_historic_data_in_db(session, start_date, interval="1d"):
     # first fetch all coin ids from
-    ids = []
-    try:
-        session = postgres.get_session()
-        ids = postgres.get_all_ids(session, POSTGRES_TABLE_META_DATA, POSTGRES_TABLE_META_DATA_ID)
-        postgres.close_session(session)
-    except Exception as e:
-        logger.error(f"Something went wrong while retreving coins_ids from database:{e}")
+    ids = get_all_active_coin_ids(session)
     for coin_id in ids:
         coin_historic = fetch_coin_pricing_historic(coin_id, start_date, interval)
         insert_historic_coin_price_in_db(session, coin_id, coin_historic)
 
+
+def get_all_active_coin_ids(session):
+    try:
+        clauses = {POSTGRES_TABLE_META_DATA_IS_MONITORED: True}
+        data = postgres.get_data(session, POSTGRES_TABLE_META_DATA,
+                                                [POSTGRES_TABLE_META_DATA_ID], clauses)
+        ids = [row[POSTGRES_TABLE_META_DATA_ID] for row in data]
+        return ids
+    except Exception as e:
+        logger.error(f"Something went wrong while retrieving coins_ids from database:{e}")
+    return []
 
 from datetime import datetime, timedelta
 

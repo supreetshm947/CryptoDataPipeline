@@ -9,7 +9,7 @@ services:
       - "9042:9042"
       - "7000:7000"
     volumes:
-      - ./cassandra_data:/bitnami
+      - ${VOLUME_CASSANDRA}:/bitnami
       - ./cql_scripts/:/docker-entrypoint-initdb.d
     environment:
       - CASSANDRA_CLUSTER_NAME=crypto-cluster
@@ -23,7 +23,7 @@ services:
     ports:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ${VOLUME_POSTGRES}:/var/lib/postgresql/data
       - ./sql_scripts/tables.sql:/docker-entrypoint-initdb.d/tables.sql
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -54,6 +54,22 @@ services:
     depends_on:
         - zookeeper
 
+  elasticsearch:
+    image: elasticsearch:8.9.0
+    container_name: elasticsearch
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - xpack.security.enabled=false #disabling https
+    ports:
+      - "${ELASTIC_PORT}:${ELASTIC_PORT}"  # Expose port 9200 for HTTP communication
+    volumes:
+        - ${VOLUME_ELASTIC}:/usr/share/elasticsearch/data
+
 volumes:
   cassandra:
   postgres:
+  esdata:

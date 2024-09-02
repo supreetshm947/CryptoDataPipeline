@@ -3,9 +3,8 @@ import json
 import time
 import signal
 
-from coin_utils import fetch_coin_tickers_data
-from constants import KAFKA_HOST, KAFKA_PORT, POSTGRES_TABLE_META_DATA, POSTGRES_TABLE_META_DATA_ID
-from spark_connector import postgres
+from coin_utils import fetch_coin_tickers_data, get_all_active_coin_ids
+from constants import KAFKA_HOST, KAFKA_PORT
 import sys
 
 import logging
@@ -39,8 +38,7 @@ class CoinPriceProducer:
                 # self.producer.send(KAFKA_TOPIC_HOURLY_PRICE, value=sample_yr_historic)
 
                 # Get all coin ids
-                coin_ids = postgres.get_all_ids(self.session, POSTGRES_TABLE_META_DATA,
-                                                POSTGRES_TABLE_META_DATA_ID)
+                coin_ids = get_all_active_coin_ids(self.session)
 
                 for coin_id in coin_ids:
                     try:
@@ -56,7 +54,7 @@ class CoinPriceProducer:
 
             time.sleep(self.interval)
 
-    def shutdown_producer(self, sig, frame):
+    def shutdown_producer(self):
         logger.info('Shutting down CoinPriceProducer...')
         self.producer.flush()
         self.producer.close()

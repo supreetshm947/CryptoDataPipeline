@@ -1,125 +1,64 @@
-from pyspark.sql import SparkSession
-from constants import POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DATABASE_NAME
-import psycopg2
 import logging
+from constants import POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DATABASE_NAME
+from mylogger import get_logger
+from utils import exception_logger
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
+global_options = {
+    "url": f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DATABASE_NAME}",
+    "user": POSTGRES_USER,
+    "password": POSTGRES_PASSWORD,
+    "driver": "org.postgresql.Driver"
+}
 
-# def get_session():
-#     session = SparkSession.builder.appName("postgres_connector").config("spark.jars",
-#                                                                         "postgresql-42.7.4.jar").getOrCreate()
-#     session.sparkContext.setLogLevel("WARN")
-#     logger.info(
-#         f"Spark Session for Postgres Started.")
-#     return session
-
-
-# def close_session(session):
-#     try:
-#         session.stop()
-#         logger.info(
-#             f"Spark Session Closed Successfully.")
-#     except Exception as e:
-#         logger.error(f" Something went wrong while closing session: {e}")
-
-
+@exception_logger("postgres.check_if_id_already_exists")
 def check_if_id_already_exists(session, db_table, id_col, id_val):
-    try:
-        logger.info(
-            f"Checking if {id_col}: '{id_val}' exists in table '{db_table}' of database '{POSTGRES_DATABASE_NAME}'")
-        df = session.read.format("jdbc") \
-            .option("url", f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DATABASE_NAME}") \
-            .option("dbtable", f"(SELECT {id_col} FROM {db_table} WHERE {id_col} = '{id_val}') AS subquery") \
-            .option("user", POSTGRES_USER) \
-            .option("password", POSTGRES_PASSWORD) \
-            .option("driver", "org.postgresql.Driver") \
-            .load()
-        count = df.count()
-        logger.info(f"{id_col}: '{id_val}' {'exists' if count > 0 else 'does not exist'} in the database.")
-        return count
-    except Exception as e:
-        logger.error(f"Error checking if {id_val} exists: {e}")
-    return None
+    logger.info(
+        f"Checking if {id_col}: '{id_val}' exists in table '{db_table}' of database '{POSTGRES_DATABASE_NAME}'")
+    options = global_options.copy()
+    options["dbtable"] = f"(SELECT {id_col} FROM {db_table} WHERE {id_col} = '{id_val}') AS subquery"
+    df = session.read.format("jdbc") \
+        .options(**options) \
+        .load()
+    count = df.count()
+    logger.info(f"{id_col}: '{id_val}' {'exists' if count > 0 else 'does not exist'} in the database.")
+    return count
 
-
+@exception_logger("postgres.insert_df")
 def insert_df(df, db_table, id_val=None):
-    try:
-        logger.info(f"Inserting {id_val} in table {db_table}.")
-        df.write.format("jdbc") \
-            .option("url", f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DATABASE_NAME}") \
-            .option("dbtable", db_table) \
-            .option("user", POSTGRES_USER) \
-            .option("password", POSTGRES_PASSWORD) \
-            .option("driver", "org.postgresql.Driver") \
-            .mode("append") \
-            .save()
-        logger.info(f"Inserted {id_val} in table {db_table} successfully.")
-    except Exception as e:
-        logger.error(f"Error inserting data in {db_table}: {e}")
+    logger.info(f"Inserting {id_val} in table {db_table}.")
+    options = global_options.copy()
+    options["dbtable"] = db_table
+    df.write.format("jdbc") \
+        .options(**options) \
+        .mode("append") \
+        .save()
+    logger.info(f"Inserted {id_val} in table {db_table} successfully.")
 
+@exception_logger("postgres.get_data")
+def get_data(session, db_table, columns=None, clauses=None):
+    # Construct the base query
+    columns = columns or ["*"]
+    columns_str = ", ".join(columns)
 
-def remove_by_id(db_table, id_col, id_val):
-    try:
-        logger.info(
-            f"Attempting to remove metadata for {id_col}: {id_val} from table {db_table} in database: {POSTGRES_DATABASE_NAME}.")
+    logger.info(f"Fetching {columns_str} values from table {db_table}.")
 
-        conn = psycopg2.connect(
-            dbname=POSTGRES_DATABASE_NAME,
-            user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD,
-            host=POSTGRES_HOST,
-            port=POSTGRES_PORT
-        )
+    base_query = f"SELECT {columns_str} FROM {db_table}"
 
-        cur = conn.cursor()
+    # Build the WHERE clause if conditions are provided
+    if clauses:
+        where_clause = " AND ".join([f"{col} = '{val}'" for col, val in clauses.items()])
+        base_query += f" WHERE {where_clause}"
 
-        # Execute the delete query
-        delete_query = f"DELETE FROM {db_table} WHERE {id_col} = %s"
-        cur.execute(delete_query, (id_val,))
+    # Wrap the query as a subquery
+    query = f"({base_query}) AS subquery"
 
-        # Commit the transaction
-        conn.commit()
-        cur.close()
-        conn.close()
+    options = global_options.copy()
+    options["dbtable"] = query
 
-        logger.info(
-            f"Successfully removed metadata for {id_col}: {id_val} from table {db_table} in database: {POSTGRES_DATABASE_NAME}.")
-    except Exception as e:
-        logger.error(f"Error in removing metadata for {id_val}: {e}")
-
-
-def get_all_ids(session, db_table, id_col):
-    logger.info(f"Fetching all {id_col} values from table {db_table}.")
-    try:
-        query = f"(SELECT {id_col} FROM {db_table}) AS subquery"
-        df = session.read.format("jdbc") \
-            .option("url", f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DATABASE_NAME}") \
-            .option("dbtable", query) \
-            .option("user", POSTGRES_USER) \
-            .option("password", POSTGRES_PASSWORD) \
-            .option("driver", "org.postgresql.Driver") \
-            .load()
-        ids = [row[id_col] for row in df.collect()]
-        return ids
-    except Exception as e:
-        logger.error(f"Error fetching all {id_col} values: {e}")
-    return []
-
-
-def get_data_by_id(session, db_table, id_col, id_val):
-    logger.info(f"Fetching data for {id_col}: {id_val} from table {db_table}.")
-    try:
-        query = f"(SELECT * from {db_table} where {id_col}='id_val') as subquery"
-        df = session.read.format("jdbc") \
-            .option("url", f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DATABASE_NAME}") \
-            .option("dbtable", query) \
-            .option("user", POSTGRES_USER) \
-            .option("password", POSTGRES_PASSWORD) \
-            .option("driver", "org.postgresql.Driver") \
-            .load()
-        return df
-    except Exception as e:
-        logger.error(f"Error fetching data for {id_val}: {e}")
-    return None
+    df = session.read.format("jdbc") \
+        .options(**options) \
+        .load()
+    ids = [row.asDict() for row in df.collect()]
+    return ids

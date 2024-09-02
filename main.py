@@ -1,11 +1,9 @@
 # Load Coin Metadata
 from threading import Thread
-
-from coin_utils import load_coin_metadata, load_coin_historic_data
-from constants import KAFKA_HOST, KAFKA_PORT, KAFKA_TOPIC_HOURLY_PRICE, CASSANDRA_KEYSPACE
+from constants import KAFKA_HOST, KAFKA_PORT, KAFKA_TOPIC_HOURLY_PRICE
 from kafka_utils.hourly_coin_price_consumer import CoinPriceConsumer
 from kafka_utils.hourly_coin_price_producer import CoinPriceProducer
-from spark_connector import cassandra, postgres
+from spark_connector.elastic import add_index
 from spark_connector.session_utils import get_spark_session
 
 # load_coin_metadata()
@@ -44,6 +42,9 @@ def start_kafka_consumer(consumer):
 
 def main():
     session = get_spark_session()
+
+    # adding index to Elasticsearch
+    add_index()
 
     KAFKA_CONSUMER_ARGUMENT["session"] = session
     KAFKA_PRODUCER_ARGUMENT["session"] = session
