@@ -1,9 +1,12 @@
 # Load Coin Metadata
 from threading import Thread
-from constants import KAFKA_HOST, KAFKA_PORT, KAFKA_TOPIC_HOURLY_PRICE
+from constants import KAFKA_HOST, KAFKA_PORT, KAFKA_TOPIC_HOURLY_PRICE, KAFKA_TOPIC_REDDIT_SUBMISSIONS
 from kafka_utils.hourly_coin_price_consumer import CoinPriceConsumer
 from kafka_utils.hourly_coin_price_producer import CoinPriceProducer
-from spark_connector.elastic import add_index
+from kafka_utils.reddit_submission_consumer import RedditSubmissionConsumer
+from kafka_utils.reddit_submission_producer import RedditSubmissionProducer
+from reddit_client import get_reddit_client
+from spark_connector.elastic import create_reddit_index, get_elastic_session
 from spark_connector.session_utils import get_spark_session
 
 # load_coin_metadata()
@@ -14,11 +17,12 @@ from spark_connector.session_utils import get_spark_session
 # start_date = str((datetime.now() - timedelta(days=364)).date())
 # load_coin_historic_data(start_date)
 
-KAFKA_PRODUCERS = [CoinPriceProducer]
+KAFKA_PRODUCERS = [CoinPriceProducer, RedditSubmissionProducer]
 KAFKA_PRODUCER_ARGUMENT = dict()
-KAFKA_PRODUCER_INTERVALS = [3600]
-KAFKA_TOPICS = [KAFKA_TOPIC_HOURLY_PRICE]
-KAFKA_CONSUMERS = [CoinPriceConsumer]
+KAFKA_PRODUCER_INTERVALS = [3600, 43200]
+KAFKA_GROUP_ID = "crypto-group"
+KAFKA_TOPICS = [KAFKA_TOPIC_HOURLY_PRICE, KAFKA_TOPIC_REDDIT_SUBMISSIONS]
+KAFKA_CONSUMERS = [CoinPriceConsumer, RedditSubmissionConsumer]
 KAFKA_CONSUMER_ARGUMENT = dict()
 
 
@@ -32,7 +36,8 @@ def start_kafka_producer(producer):
 
 
 def instantiate_kafka_consumers():
-    return [consumer(KAFKA_HOST, KAFKA_PORT, KAFKA_TOPICS[i], **KAFKA_CONSUMER_ARGUMENT) for i, consumer in
+    return [consumer(KAFKA_HOST, KAFKA_PORT, KAFKA_GROUP_ID, KAFKA_TOPICS[i], **KAFKA_CONSUMER_ARGUMENT) for i, consumer
+            in
             enumerate(KAFKA_CONSUMERS)]
 
 
@@ -42,12 +47,23 @@ def start_kafka_consumer(consumer):
 
 def main():
     session = get_spark_session()
+    reddit = get_reddit_client()
 
     # adding index to Elasticsearch
-    add_index()
+    es = get_elastic_session()
+    create_reddit_index(es)
 
-    KAFKA_CONSUMER_ARGUMENT["session"] = session
-    KAFKA_PRODUCER_ARGUMENT["session"] = session
+    KAFKA_PRODUCER_ARGUMENT.update(
+        {
+            "session": session,
+            "reddit": reddit
+        }
+    )
+    KAFKA_CONSUMER_ARGUMENT.update(
+        {
+            "session": session
+        }
+    )
 
     producers = instantiate_kafka_producers()
     consumers = instantiate_kafka_consumers()
@@ -60,7 +76,7 @@ def main():
     [thread.join() for thread in producer_threads + consumer_threads]
 
     session.stop()
-
+    es.close()
 
 if __name__ == "__main__":
     main()

@@ -41,7 +41,7 @@ services:
 
   kafka:
     image: bitnami/kafka:latest
-    container_name: kafka_utils
+    container_name: kafka
     ports:
       - "${KAFKA_OUTSIDE_PORT}:${KAFKA_OUTSIDE_PORT}"
     environment:

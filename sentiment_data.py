@@ -49,7 +49,3 @@ def load_reddit_submission_for_coins_in_db(session, since_date=None, until_date=
         reddit = get_reddit_client()
         reddit_submission = search_within_subreddit(reddit, coin_id, keywords, limit=limit)
         insert_reddit_submission_in_db(session, reddit_submission)
-
-
-session = get_spark_session()
-load_reddit_submission_for_coins_in_db(session, limit=1)
