@@ -26,12 +26,12 @@ def fetch_and_insert_coin_prices():
             logger.info(f"Successfully inserted price data for {coin_id} for {in_time}.")
         except Exception as e:
             logger.error(f"Error while loading hourly price data for {coin_id}: {e}")
-
+    session.stop()
 
 with DAG(
         'fetch_and_insert_coin_prices_hourly',
         schedule_interval=timedelta(hours=1),
-        start_date=datetime.today(),
+        start_date=datetime.now(),
         catchup=False,
 ) as dag:
     hello_task = PythonOperator(
