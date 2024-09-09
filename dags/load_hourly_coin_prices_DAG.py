@@ -35,6 +35,6 @@ with DAG(
         catchup=False,
 ) as dag:
     hello_task = PythonOperator(
-        task_id="hello_task",
+        task_id="fetch_and_insert_coin_prices_hourly",
         python_callable=fetch_and_insert_coin_prices
     )
