@@ -36,10 +36,10 @@ setup: init_db create_user
 
 # Targets for starting Airflow
 start_webserver:
-	. $(VENV_PATH) && airflow webserver --port 8080
+	. $(VENV_PATH) && airflow webserver --port 8080 &
 
 start_scheduler:
-	. $(VENV_PATH) && airflow scheduler
+	. $(VENV_PATH) && airflow scheduler &
 
 start: start_webserver start_scheduler
 	@echo "Airflow is running."
