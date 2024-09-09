@@ -18,7 +18,7 @@ def convert_submission_to_dict(submission, coin_id, sort_type):
         'url': submission.url or "",
         'num_comments': submission.num_comments,
         'created_utc':  convert_seconds_to_datetime(submission.created_utc),
-        'selftext': submission.selftext or "",
+        'selftext': submission.selftext or submission.title or "",
         'subreddit': submission.subreddit.display_name,
         'author': str(submission.author),
         'sort_type': sort_type,

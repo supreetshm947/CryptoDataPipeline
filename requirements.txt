@@ -9,3 +9,5 @@ cassandra-driver==3.29.1
 kafka-python==2.0.2
 elasticsearch==8.15.0
 praw==7.7.1
+flask-session
+apache-airflow==2.10.1
