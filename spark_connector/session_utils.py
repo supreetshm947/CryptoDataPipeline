@@ -1,5 +1,7 @@
 from pyspark.sql import SparkSession
 import logging
+from constants import (MINIO_KEY, MINIO_SECRET,MINIO_ENDPOINT)
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -10,7 +12,12 @@ def get_spark_session():
     session = SparkSession.builder \
         .appName("MultiDataSourceIntegration") \
         .config("spark.jars.packages",
-                "com.datastax.spark:spark-cassandra-connector_2.12:3.0.0,org.postgresql:postgresql:42.7.4,org.elasticsearch:elasticsearch-spark-30_2.12:8.5.0") \
+                        "io.delta:delta-core_2.12:2.1.0,org.apache.hadoop:hadoop-aws:3.4.0") \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+        .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT) \
+        .config("spark.hadoop.fs.s3a.access.key", MINIO_KEY) \
+        .config('spark.hadoop.fs.s3a.secret.key', MINIO_SECRET) \
         .getOrCreate()
     session.sparkContext.setLogLevel("WARN")
     logger.info("Spark Session Started.")

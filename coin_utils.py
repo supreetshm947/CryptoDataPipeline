@@ -66,10 +66,10 @@ def fetch_coin_meta_data(coin_id):
         print(f"An unexpected error occurred: {e}")
     return None
 
-
-def load_coin_metadata(session, n=NUMBER_OF_COINS):
+# use this function to load coin metadata.
+def load_coin_metadata(session, n=int(NUMBER_OF_COINS)):
     coins = fetch_coins()
-
+    logger.info(f"Number of coins to fetch: {n}")
     top_n = coins[(coins['rank'] > 0) & (coins['rank'] <= n)]
     top_n_new = coins[(coins['is_new']) & (coins['is_active'])].sort_values(by=['rank'], ascending=True).head(n)
     all_coins = pd.concat([top_n, top_n_new])
