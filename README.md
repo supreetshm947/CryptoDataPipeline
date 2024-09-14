@@ -1,5 +1,9 @@
 # Cryptocurrency Market Analysis and Trading Insights Platform
 
+<p align="center>
+  <img src="crypto_app_flow.png" alt="crypto_app_flow" style="width=60%;"/>
+</p>
+
 ## Overview
 
 This project is designed to collect, analyze, and visualize real-time and historical cryptocurrency data using the CoinPaprika API. The platform integrates data from various sources, and provides actionable insights to help monitor market trends.
