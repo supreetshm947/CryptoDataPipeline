@@ -1,13 +1,13 @@
-version: '3.9'
 
 services:
   cassandra:
-    image: bitnami/cassandra:latest
+    image: bitnami/cassandra:4.0
+    platform: linux/arm64
     user: root
     container_name: cassandra
     ports:
-      - "9042:9042"
-      - "7000:7000"
+      - "${CASSANDRA_HOST_PORT_NATIVE}:${CASSANDRA_DOCKER_PORT_NATIVE}" 
+      - "${CASSANDRA_HOST_PORT_INTER}:${CASSANDRA_DOCKER_PORT_INTER}" 
     volumes:
       - ${VOLUME_CASSANDRA}:/bitnami
       - ./cql_scripts/:/docker-entrypoint-initdb.d
@@ -45,7 +45,7 @@ services:
     ports:
       - "${KAFKA_OUTSIDE_PORT}:${KAFKA_OUTSIDE_PORT}"
     environment:
-      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka_utils:${KAFKA_INSIDE_PORT},OUTSIDE://${KAFKA_HOST}:${KAFKA_OUTSIDE_PORT}
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:${KAFKA_INSIDE_PORT},OUTSIDE://${KAFKA_HOST}:${KAFKA_OUTSIDE_PORT}
       KAFKA_LISTENER_NAME: INSIDE
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
       KAFKA_LISTENERS: INSIDE://0.0.0.0:${KAFKA_INSIDE_PORT},OUTSIDE://0.0.0.0:${KAFKA_OUTSIDE_PORT}
