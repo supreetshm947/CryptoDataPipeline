@@ -4,6 +4,7 @@ postgres_data
 __pycache__
 .venv
 .idea
-test_*
+*test*
 esdata
 logs
+*.tgz
