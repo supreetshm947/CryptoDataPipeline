@@ -12,7 +12,7 @@ SORT_RELEVANCE="relevance"
 def convert_submission_to_dict(submission, coin_id, sort_type):
     post_dict = {
         'coin_id':coin_id,
-        'id': submission.id,
+        'submission_id': submission.id,
         'title': submission.title or "",
         'score': submission.score,
         'url': submission.url or "",

@@ -4,15 +4,18 @@ import spark_connector.postgres as postgres
 from pyspark.sql.functions import col, to_timestamp
 from pyspark.sql import Row
 from constants import (POSTGRES_TABLE_META_DATA, POSTGRES_TABLE_META_DATA_ID,
-                       CASSANDRA_TABLE_CRYPTO_PRICE_DATA, NUMBER_OF_COINS, POSTGRES_TABLE_META_DATA_IS_MONITORED)
-from utils import convert_iso_to_datetime
+                       CASSANDRA_TABLE_CRYPTO_PRICE_DATA, NUMBER_OF_COINS, POSTGRES_TABLE_META_DATA_IS_MONITORED,
+                       MINIO_PATH_COIN_META, COIN_META_ID, COIN_META_IS_MONITORED, MINIO_COIN_META_STORAGE_TYPE,
+                       COIN_PRICE_COMPOSITE_KEY_READ_TIME, COIN_PRICE_COMPOSITE_KEY_ID, MINIO_PATH_COIN_PRICE,
+                       MINIO_COIN_PRICE_STORAGE_TYPE)
+from spark_connector import minio_utils
+from utils import convert_iso_to_datetime, exception_logger
 import spark_connector.cassandra as cassandra
-import logging
 import traceback
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from mylogger import get_logger
 
+logger = get_logger()
 
 def fetch_coins():
     try:
@@ -66,29 +69,35 @@ def fetch_coin_meta_data(coin_id):
         print(f"An unexpected error occurred: {e}")
     return None
 
+
 # use this function to load coin metadata.
 def load_coin_metadata(session, n=int(NUMBER_OF_COINS)):
     coins = fetch_coins()
     logger.info(f"Number of coins to fetch: {n}")
     top_n = coins[(coins['rank'] > 0) & (coins['rank'] <= n)]
-    top_n_new = coins[(coins['is_new']) & (coins['is_active'])].sort_values(by=['rank'], ascending=True).head(n)
+    top_n_new = coins[(coins['is_new']) & (coins['is_active'])].sort_values(by=['rank'], ascending=True).head(n//2)
     all_coins = pd.concat([top_n, top_n_new])
-
+    #
     all_coins_metadata = [fetch_coin_meta_data(coin['id']) for _, coin in all_coins.iterrows()]
+    # import json
+    # #
+    # with open("../sample_json/meta_btc.json") as f:
+    #     all_coins_metadata = [json.load(f)]
 
-    for meta_data in all_coins_metadata:
-        insert_coin_metadata_in_db(meta_data, session)
+    insert_coin_metadata_in_db(all_coins_metadata, session)
 
 
-def insert_coin_metadata_in_db(coin_metadata, session):
+@exception_logger("coin_utils.insert_coin_metadata_in_db")
+def insert_coin_metadata_in_db(all_coins_metadata, session):
     default_timestamp = '1970-01-01 00:00:00'
     default_string = ""
     default_boolean = False
     default_int = 0
     default_float = 0.0
-    try:
+    coin_rows = []
+    for coin_metadata in all_coins_metadata:
         coin_row = Row(
-            id=coin_metadata['id'],
+            coin_id=coin_metadata['id'],
             name=coin_metadata.get('name') if coin_metadata.get('name') is not None else default_string,
             symbol=coin_metadata.get('symbol') if coin_metadata.get('symbol') is not None else default_string,
             rank=int(coin_metadata.get('rank')) if coin_metadata.get('rank') is not None else default_int,
@@ -120,17 +129,14 @@ def insert_coin_metadata_in_db(coin_metadata, session):
                 'USD', {}).get('price') is not None else default_float,  # Needs periodic updates
             is_monitored=True
         )
-        df = session.createDataFrame([coin_row])
+        coin_rows.append(coin_row)
+    df = session.createDataFrame(coin_rows)
 
-        # Fix timestamp datatype
-        df = df.withColumn('started_at', to_timestamp(col('started_at'), 'yyyy-MM-dd HH:mm:ss'))
-        df = df.withColumn('last_updated', to_timestamp(col('last_updated'), 'yyyy-MM-dd HH:mm:ss'))
+    # Fix timestamp datatype
+    df = df.withColumn('started_at', to_timestamp(col('started_at'), 'yyyy-MM-dd HH:mm:ss'))
+    df = df.withColumn('last_updated', to_timestamp(col('last_updated'), 'yyyy-MM-dd HH:mm:ss'))
 
-        if not postgres.check_if_id_already_exists(session, POSTGRES_TABLE_META_DATA,
-                                                   POSTGRES_TABLE_META_DATA_ID, coin_metadata['id']):
-            postgres.insert_df(df, POSTGRES_TABLE_META_DATA, coin_metadata['id'])
-    except Exception as e:
-        logger.error(f"Something went wrong while persisting metadata for {coin_metadata.get(id, 'id-XXX')}:{e}")
+    minio_utils.insert_df(df, MINIO_COIN_META_STORAGE_TYPE, "rank", MINIO_PATH_COIN_META)
 
 
 def fetch_coin_pricing_historic(coin_id, start_timestamp, interval='1d'):
@@ -150,67 +156,71 @@ def fetch_coin_pricing_historic(coin_id, start_timestamp, interval='1d'):
     return pd.DataFrame()
 
 
+@exception_logger("coin_utils.insert_coin_price_in_db")
 def insert_coin_price_in_db(session, coin_price_data):
-    try:
-        date_time = convert_iso_to_datetime(coin_price_data["last_updated"])
-        data = [
-            Row(coin_id=coin_price_data["id"],
-                read_timestamp=coin_price_data["last_updated"],
+    date_time = convert_iso_to_datetime(coin_price_data["last_updated"])
+    data = [
+        Row(coin_id=coin_price_data["id"],
+            read_timestamp=coin_price_data["last_updated"],
+            date=date_time.date(),
+            hour=date_time.hour,
+            price=float(coin_price_data["quotes"]["USD"]["price"]),
+            volume_24h=coin_price_data["quotes"]["USD"]["volume_24h"],
+            market_cap=coin_price_data["quotes"]["USD"]["market_cap"]
+            )
+    ]
+    df = session.createDataFrame(data)
+    minio_utils.insert_df(df, MINIO_COIN_PRICE_STORAGE_TYPE,
+                          [COIN_PRICE_COMPOSITE_KEY_ID, COIN_PRICE_COMPOSITE_KEY_READ_TIME], MINIO_PATH_COIN_PRICE)
+
+
+@exception_logger("coin_utils.insert_historic_coin_price_in_db")
+def insert_historic_coin_price_in_db(session, coin_id, coin_price_data):
+    data_list = []
+    for data in coin_price_data:
+        date_time = convert_iso_to_datetime(data["timestamp"])
+        data_list.append(
+            Row(coin_id=coin_id,
+                read_timestamp=data["timestamp"],
                 date=date_time.date(),
                 hour=date_time.hour,
-                price=float(coin_price_data["quotes"]["USD"]["price"]),
-                volume_24h=coin_price_data["quotes"]["USD"]["volume_24h"],
-                market_cap=coin_price_data["quotes"]["USD"]["market_cap"]
-                )
-        ]
-        df = session.createDataFrame(data)
-        cassandra.insert_df(df, CASSANDRA_TABLE_CRYPTO_PRICE_DATA, coin_price_data["id"])
-    except Exception as e:
-        coin_id = coin_price_data["id"]
-        logger.error(f"Something went wrong while persisting price data for {coin_id}:{e}")
-        logger.error(traceback.format_exc())
-        raise e
+                price=float(data["price"]),
+                volume_24h=data["volume_24h"],
+                market_cap=data["market_cap"]
+                ),
+        )
+    df = session.createDataFrame(data_list)
+    minio_utils.insert_df(df, MINIO_COIN_PRICE_STORAGE_TYPE,
+                          [COIN_PRICE_COMPOSITE_KEY_ID, COIN_PRICE_COMPOSITE_KEY_READ_TIME], MINIO_PATH_COIN_PRICE)
 
-def insert_historic_coin_price_in_db(session, coin_id, coin_price_data):
-    try:
-        data_list = []
-        for data in coin_price_data:
-            date_time = convert_iso_to_datetime(data["timestamp"])
-            data_list.append(
-                Row(coin_id=coin_id,
-                    read_timestamp=data["timestamp"],
-                    date=date_time.date(),
-                    hour=date_time.hour,
-                    price=float(data["price"]),
-                    volume_24h=data["volume_24h"],
-                    market_cap=data["market_cap"]
-                    ),
-            )
-        df = session.createDataFrame(data_list)
-        cassandra.insert_df(df, CASSANDRA_TABLE_CRYPTO_PRICE_DATA, coin_id)
-    except Exception as e:
-        logger.error(f"Something went wrong while persisting historic data for {coin_id}:{e}")
-        logger.error(traceback.format_exc())
-        raise e
 
+@exception_logger("coin_utils.load_coin_historic_data_in_db")
 def load_coin_historic_data_in_db(session, start_date, interval="1d"):
     # first fetch all coin ids from
-    ids = get_all_active_coin_ids(session)
+    data = get_all_active_coins(session, [COIN_META_ID])
+
+    data_existing = minio_utils.load_df(session, MINIO_COIN_PRICE_STORAGE_TYPE, MINIO_PATH_COIN_PRICE, columns=[COIN_META_ID])
+    id_existing = set([row[COIN_META_ID] for row in data_existing])
+
+    ids = set([row[COIN_META_ID] for row in data])
+    ids = list(ids - id_existing)
+
     for coin_id in ids:
         coin_historic = fetch_coin_pricing_historic(coin_id, start_date, interval)
+        # import json
+        # with open("../sample_json/btc_historic_1year.json") as f:
+        #     coin_historic = json.load(f)
+        logger.info(f"Inserting Price data for {coin_id} from {start_date} for every {interval}.")
         insert_historic_coin_price_in_db(session, coin_id, coin_historic)
 
 
-def get_all_active_coin_ids(session):
-    try:
-        clauses = {POSTGRES_TABLE_META_DATA_IS_MONITORED: True}
-        data = postgres.get_data(session, POSTGRES_TABLE_META_DATA,
-                                                [POSTGRES_TABLE_META_DATA_ID], clauses)
-        ids = [row[POSTGRES_TABLE_META_DATA_ID] for row in data]
-        return ids
-    except Exception as e:
-        logger.error(f"Something went wrong while retrieving coins_ids from database:{e}")
-    return []
+@exception_logger("coin_utils.get_all_active_coin_ids")
+def get_all_active_coins(session, columns=None):
+    clauses = {COIN_META_IS_MONITORED: True}
+    data = minio_utils.load_df(session, MINIO_COIN_META_STORAGE_TYPE, MINIO_PATH_COIN_META, columns=columns,
+                               filters=clauses)
+    return data
+
 
 from datetime import datetime, timedelta
 

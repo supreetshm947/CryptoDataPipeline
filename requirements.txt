@@ -1,6 +1,7 @@
 requests==2.32.3
 pandas==2.2.2
-pyspark==3.5.2
+#pyspark==3.3.2
+pyspark==3.4.3
 python-dotenv==1.0.1
 mylogging==4.0.6
 psycopg2-binary==2.9.9
@@ -9,7 +10,8 @@ cassandra-driver==3.29.1
 kafka-python==2.0.2
 elasticsearch==8.15.0
 praw==7.7.1
-delta-spark==3.2.0
+delta-spark==2.4.0
 minio==7.2.8
 flask-session
 apache-airflow==2.10.1
+modelbit

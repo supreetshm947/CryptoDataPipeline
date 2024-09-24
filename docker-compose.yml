@@ -1,75 +1,134 @@
-
 services:
-  cassandra:
-    image: bitnami/cassandra:4.0
-    platform: linux/arm64
-    user: root
-    container_name: cassandra
+  minio:
+    image: minio/minio:latest
+    container_name: minio-container
     ports:
-      - "${CASSANDRA_HOST_PORT_NATIVE}:${CASSANDRA_DOCKER_PORT_NATIVE}" 
-      - "${CASSANDRA_HOST_PORT_INTER}:${CASSANDRA_DOCKER_PORT_INTER}" 
+      - "9000:9000"   # MinIO API
+      - "9001:9001"   # MinIO Console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
     volumes:
-      - ${VOLUME_CASSANDRA}:/bitnami
-      - ./cql_scripts/:/docker-entrypoint-initdb.d
-    environment:
-      - CASSANDRA_CLUSTER_NAME=crypto-cluster
-      - CASSANDRA_DC=datacenter1
-      - cluster.rack=rack1
-      - CASSANDRA_SEEDS=cassandra
+      - minio_data:/data   # Data volume for MinIO storage
+    entrypoint: ["sh", "-c", "minio server /data --console-address ':${MINIO_PORT_CONSOLE}'"]
+    networks:
+      - my_network
 
-  postgres:
-    image: postgres:15
-    container_name: postgres
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - 9870:9870
+      - 9002:9000
     volumes:
-      - ${VOLUME_POSTGRES}:/var/lib/postgresql/data
-      - ./sql_scripts/tables.sql:/docker-entrypoint-initdb.d/tables.sql
+      - hadoop_namenode:/hadoop/dfs/name
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DATABASE_NAME}
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop.env
+    networks:
+      - my_network
 
-  zookeeper:
-    image: zookeeper:3.7.1
-    container_name: zookeeper
-    ports:
-      - "${ZOOKEEPER_PORT}:${ZOOKEEPER_PORT}"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT}
-      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
-
-  kafka:
-    image: bitnami/kafka:latest
-    container_name: kafka
-    ports:
-      - "${KAFKA_OUTSIDE_PORT}:${KAFKA_OUTSIDE_PORT}"
-    environment:
-      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:${KAFKA_INSIDE_PORT},OUTSIDE://${KAFKA_HOST}:${KAFKA_OUTSIDE_PORT}
-      KAFKA_LISTENER_NAME: INSIDE
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
-      KAFKA_LISTENERS: INSIDE://0.0.0.0:${KAFKA_INSIDE_PORT},OUTSIDE://0.0.0.0:${KAFKA_OUTSIDE_PORT}
-      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:${ZOOKEEPER_PORT}
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    restart: always
     depends_on:
-        - zookeeper
-
-  elasticsearch:
-    image: elasticsearch:8.9.0
-    container_name: elasticsearch
-    environment:
-      - node.name=es01
-      - cluster.name=es-docker-cluster
-      - discovery.type=single-node
-      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - xpack.security.enabled=false #disabling https
-    ports:
-      - "${ELASTIC_PORT}:${ELASTIC_PORT}"  # Expose port 9200 for HTTP communication
+      - namenode
     volumes:
-        - ${VOLUME_ELASTIC}:/usr/share/elasticsearch/data
+      - hadoop_datanode:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - my_network
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    depends_on:
+      - datanode
+      - namenode
+    restart: always
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - my_network
+
+  nodemanager1:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    restart: always
+    depends_on:
+      - resourcemanager
+      - datanode
+      - namenode
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
+    env_file:
+      - ./hadoop.env
+    networks:
+      - my_network
+
+  historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: historyserver
+    restart: always
+    depends_on:
+      - nodemanager1
+      - resourcemanager
+      - datanode
+      - namenode
+    environment:
+      SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hadoop.env
+    networks:
+      - my_network
+
+  spark-master:
+    image: bitnami/spark:3.4.3
+    container_name: spark-master
+    ports:
+      - "9090:8080"  # Spark Web UI
+      - "7077:7077"  # Spark Master Port
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    networks:
+      - my_network
+
+  spark-worker:
+    image: bitnami/spark:3.4.3
+    container_name: spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G      #<--- adjust accordingly
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+    networks:
+      - my_network
 
 volumes:
-  cassandra:
-  postgres:
-  esdata:
+  hadoop_namenode:
+  hadoop_datanode:
+  hadoop_historyserver:
+  minio_data:
+
+networks:
+  my_network:
+    driver: bridge

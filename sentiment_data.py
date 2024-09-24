@@ -1,11 +1,14 @@
+import coin_utils
 from constants import POSTGRES_TABLE_META_DATA_IS_MONITORED, POSTGRES_TABLE_META_DATA, \
     POSTGRES_TABLE_META_DATA_NAME, POSTGRES_TABLE_META_DATA_SYMBOL, POSTGRES_TABLE_META_DATA_ID, \
-    ELASTIC_REDDIT_INDEX_NAME
+    ELASTIC_REDDIT_INDEX_NAME, COIN_META_ID, MINIO_REDDIT_STORAGE_TYPE, REDDIT_COMPOSITE_KEY_ID, \
+    REDDIT_COMPOSITE_KEY_SUBMISSION_ID, MINIO_PATH_REDDIT
 from reddit_client import search_within_subreddit, get_reddit_client
-from spark_connector.elastic import insert_df
-from spark_connector.session_utils import get_spark_session
 # from tweepy_client import get_twitter_api, get_tweets
-from spark_connector import postgres
+from spark_connector import minio_utils
+from mylogger import get_logger
+
+logger = get_logger()
 
 ### Currently not using the twitter API. ###
 # def insert_tweets_in_db(session, tweets):
@@ -34,19 +37,20 @@ from spark_connector import postgres
 
 def insert_reddit_submission_in_db(session, submissions):
     df = session.createDataFrame(submissions)
-    insert_df(df, id_col="id", index=f"{ELASTIC_REDDIT_INDEX_NAME}")
+    minio_utils.insert_df(df, MINIO_REDDIT_STORAGE_TYPE, [REDDIT_COMPOSITE_KEY_ID, REDDIT_COMPOSITE_KEY_SUBMISSION_ID],
+              MINIO_PATH_REDDIT)
+
 
 def load_reddit_submission_for_coins_in_db(session, since_date=None, until_date=None, limit=500):
     # Get coin meta-data from database
-    clauses = {POSTGRES_TABLE_META_DATA_IS_MONITORED: True}
-    coins = postgres.get_data(session, POSTGRES_TABLE_META_DATA,
-                             [POSTGRES_TABLE_META_DATA_ID, POSTGRES_TABLE_META_DATA_NAME, POSTGRES_TABLE_META_DATA_SYMBOL], clauses)
+    coins = coin_utils.get_all_active_coins(session, [COIN_META_ID, "name", "symbol"])
 
     for coin in coins:
-        coin_id = coin[POSTGRES_TABLE_META_DATA_ID]
-        coin_name = coin[POSTGRES_TABLE_META_DATA_NAME]
-        coin_symbol = coin[POSTGRES_TABLE_META_DATA_SYMBOL]
-        keywords = [coin_name, coin_symbol]    # filtering retweets
+        coin_id = coin[COIN_META_ID]
+        coin_name = coin["name"]
+        coin_symbol = coin["symbol"]
+        keywords = [coin_name, coin_symbol]  # filtering retweets
         reddit = get_reddit_client()
         reddit_submission = search_within_subreddit(reddit, coin_id, keywords, limit=limit)
+        logger.info(f"Inserting Reddit Submissions for {coin_id}.")
         insert_reddit_submission_in_db(session, reddit_submission)

@@ -48,3 +48,15 @@ start: start_webserver start_scheduler
 clean:
 	@echo "Stopping Airflow services..."
 	# Add any cleanup commands if needed
+
+start_docker:
+	@echo "Starting docker container"
+	docker compose up -d  # Start the MinIO container
+
+stop_docker:
+	@echo "Stopping docker container..."
+	docker compose down
+
+init_minio:
+	@echo "initializing minio..."
+	. $(VENV_PATH) && python create_minio_buckets.py

@@ -1,39 +1,37 @@
 from minio import Minio
 from minio.error import S3Error
-from constants import (MINIO_KEY, MINIO_SECRET,MINIO_HOST, MINIO_BUCKET_COIN, MINIO_BUCKET_REDDIT)
+from constants import (MINIO_HOST, MINIO_PORT_API, MINIO_USER, MINIO_PASSWORD, MINIO_COIN_META_BUCKET,
+                       MINIO_COIN_PRICE_BUCKET, MINIO_REDDIT_BUCKET)
+from mylogger import get_logger
+
+logger = get_logger()
 
 
 # MinIO client configuration
 minio_client = Minio(
-    MINIO_HOST,  # MinIO endpoint
-    access_key=MINIO_KEY,  # MinIO access key
-    secret_key=MINIO_SECRET,  # MinIO secret key
+    f"{MINIO_HOST}:{MINIO_PORT_API}",
+    access_key=MINIO_USER,
+    secret_key=MINIO_PASSWORD,
     secure=False  # Use secure=True if using HTTPS
 )
 
-# Function to create a bucket if it doesn't exist
-def create_bucket(bucket_name):
+buckets = [MINIO_COIN_META_BUCKET, MINIO_COIN_PRICE_BUCKET, MINIO_REDDIT_BUCKET]
+
+
+def create_bucket_if_not_exists(bucket_name):
     try:
         if not minio_client.bucket_exists(bucket_name):
+            logger.info(f"Bucket '{bucket_name}' does not exist. Creating it...")
             minio_client.make_bucket(bucket_name)
-            print(f"Bucket '{bucket_name}' created.")
         else:
-            print(f"Bucket '{bucket_name}' already exists.")
-    except S3Error as e:
-        print(f"Error creating bucket: {e}")
-
+            logger.info(f"Bucket '{bucket_name}' already exists.")
+    except S3Error as err:
+        logger.error(f"Error: {err}")
 
 
 def main():
-    print(f"MINO_HOST: {MINIO_HOST}")
-    print(f"MINO_KEY: {MINIO_KEY}")
-    print(f"MINO_SECRET: {MINIO_SECRET}")
-
-    # Create 'coin' and 'reddit' buckets to store data in the delta lake format
-    create_bucket(MINIO_BUCKET_COIN)
-    create_bucket(MINIO_BUCKET_REDDIT)
+    for bucket in buckets:
+        create_bucket_if_not_exists(bucket)
 
 if __name__ == "__main__":
-    
     main()
-

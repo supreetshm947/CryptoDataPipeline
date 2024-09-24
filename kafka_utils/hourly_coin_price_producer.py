@@ -1,6 +1,6 @@
 import time
 
-from coin_utils import fetch_coin_tickers_data, get_all_active_coin_ids
+from coin_utils import fetch_coin_tickers_data, get_all_active_coins
 
 from kafka_utils.producer import BaseProducer
 from mylogger import get_logger
@@ -23,7 +23,7 @@ class CoinPriceProducer(BaseProducer):
                 # self.producer.send(KAFKA_TOPIC_HOURLY_PRICE, value=sample_yr_historic)
 
                 # Get all coin ids
-                coin_ids = get_all_active_coin_ids(self.session)
+                coin_ids = get_all_active_coins(self.session)
 
                 for coin_id in coin_ids:
                     try:
